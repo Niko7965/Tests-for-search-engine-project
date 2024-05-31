@@ -376,6 +376,7 @@ pub struct IterUnsafe<'b> {
 impl<'a, 'b> Iterator for IterUnsafe<'b> {
     type Item = [u32; 4];
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.chunks_to_decode < 1 {
             return None;
