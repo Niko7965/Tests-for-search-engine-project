@@ -41,6 +41,14 @@ impl VarintGB {
         }
     }
 
+    pub fn iter_unsafe<'a, 'b>(&'a self, shuffle_table: &'b DescriptorTable) -> IterUnsafe<'b> {
+        IterUnsafe {
+            descriptor_table: shuffle_table,
+            src: ptr::addr_of!(self.byte_stream[0]) as *mut u8,
+            chunks_to_decode: self.len / 4,
+        }
+    }
+
     #[allow(dead_code)]
     pub fn get_values(&self, descriptor_table: &DescriptorTable) -> Vec<u32> {
         let mut output = Vec::with_capacity(self.len());
@@ -359,7 +367,36 @@ pub fn test_safe_decoder_non_simd() {
     let u16_2 = 0b1111111111111100;
     println!("u16: {u16_2}");
 }
+pub struct IterUnsafe<'b> {
+    descriptor_table: &'b DescriptorTable,
+    src: *mut u8,
+    chunks_to_decode: u32,
+}
 
+impl<'a, 'b> Iterator for IterUnsafe<'b> {
+    type Item = [u32; 4];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.chunks_to_decode < 1 {
+            return None;
+        }
+
+        unsafe {
+            let descriptor: u8 = *self.src;
+            let chunk_addr = self.src.add(1) as *mut __m128i;
+
+            let descriptor_entry = self.descriptor_table.get_entry_for_descriptor(descriptor);
+            let shf = descriptor_entry.shuffle_sequence;
+
+            //println!("{}", chunk_addr as u32);
+
+            let chunk = decode_chunk_by_address(chunk_addr, shf);
+            self.src = self.src.add(descriptor_entry.length as usize + 1);
+            self.chunks_to_decode -= 1;
+            return Some(chunk);
+        }
+    }
+}
 pub struct Iter<'a, 'b> {
     descriptor_table: &'b DescriptorTable,
     byte_stream: &'a [u8],
@@ -395,20 +432,20 @@ impl<'a, 'b> Iterator for Iter<'a, 'b> {
             return Some(delta_chunk);
         }
 
+        /*
         let chunk_addr = ptr::addr_of!(self.byte_stream[self.descriptor_index + 1]) as *mut __m128i;
         let mut delta_chunk = decode_chunk_by_address(chunk_addr, desc_entry.shuffle_sequence);
+        */
 
-        /*
         let chunk = <&[u8; 16]>::try_from(
             &self.byte_stream[self.descriptor_index + 1..self.descriptor_index + 17],
         )
         .unwrap();
-        let mut delta_chunk = decode_chunk(chunk, desc_entry.shuffle_sequence);
-        */
+        let delta_chunk = decode_chunk(chunk, desc_entry.shuffle_sequence);
 
         self.descriptor_index += (desc_entry.length + 1) as usize;
 
-        delta_chunk_to_value_chunk(&mut delta_chunk, self.last_top);
+        //delta_chunk_to_value_chunk(&mut delta_chunk, self.last_top);
         self.last_top = delta_chunk[3];
 
         Some(delta_chunk)

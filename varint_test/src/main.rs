@@ -10,6 +10,7 @@ mod varint_su;
 
 fn main() {
     const SIZE: usize = 20000000;
+    let repetitions = 100;
 
     let no_of_inserts = SIZE;
     let mut reference_vector = Vec::new();
@@ -42,17 +43,14 @@ fn main() {
     let gb_push_time = gb_start_push.elapsed();
 
     let su_start_decode = Instant::now();
-    for val in seq_su.iter() {
-        black_box(val);
+    for _ in 0..repetitions {
+        time_varint_su(&seq_su);
     }
     let su_decode_time = su_start_decode.elapsed();
 
     let gb_start_decode = Instant::now();
-
-    for chunk in seq_gb.iter(&shuffle_table) {
-        for val in chunk {
-            black_box(val);
-        }
+    for _ in 0..repetitions {
+        time_varint_gb(&seq_gb, &shuffle_table);
     }
 
     let gb_decode_time = gb_start_decode.elapsed();
@@ -81,4 +79,16 @@ fn main() {
     println!("Decode-time: {}", ref_decode_time.as_millis());
 
     println!(" ");
+}
+
+fn time_varint_gb(seq_gb: &varint_gb::VarintGB, shuffle_table: &DescriptorTable) {
+    for chunk in seq_gb.iter_unsafe(&shuffle_table) {
+        black_box(chunk);
+    }
+}
+
+fn time_varint_su(seq_su: &varint_su::VarintSU) {
+    for val in seq_su.iter() {
+        black_box(val);
+    }
 }
