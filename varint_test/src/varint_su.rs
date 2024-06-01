@@ -48,8 +48,8 @@ impl<'a> Iterator for Iter<'a> {
             b_word = self.int_vec[self.next_index] as usize;
         }
         //println!("{b_word}");
-        x = x + (b_word + 1) * p + self.last_value;
-        self.last_value = x;
+        x = x + (b_word + 1) * p; //+ self.last_value;
+                                  //self.last_value = x;
         self.next_index += 1;
 
         Some(x)
